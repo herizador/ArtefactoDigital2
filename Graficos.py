@@ -96,7 +96,87 @@ app.layout = html.Div([
 ])
 
 # Callbacks (sin cambios)
-# ...
+# Callback para actualizar el gráfico de evolución
+@app.callback(
+    Output('grafico-evolucion', 'figure'),
+    [Input('variable-dropdown', 'value'),
+     Input('date-range', 'start_date'),
+     Input('date-range', 'end_date')]
+)
+def update_grafico(selected_variable, start_date, end_date):
+    filtered_data = datos[(datos['Nombre de la variable'] == selected_variable) & 
+                          (datos['Fecha'] >= start_date) & 
+                          (datos['Fecha'] <= end_date)]
+    fig = px.line(filtered_data, x='Fecha', y='Valor', 
+                  title=f'Evolución de {selected_variable} en Torla',
+                  labels={'Valor': selected_variable, 'Fecha': 'Fecha'},
+                  template='plotly_dark',
+                  line_shape='spline',
+                  hover_data={'Valor': ':.2f'})
+    fig.update_traces(line=dict(width=2.5))
+    return fig
+
+# Callback para actualizar el gráfico de temperatura media por año
+@app.callback(
+    Output('grafico-temperatura-media', 'figure'),
+    [Input('variable-dropdown', 'value'),
+     Input('date-range', 'start_date'),
+     Input('date-range', 'end_date')]
+)
+def update_grafico_temperatura(selected_variable, start_date, end_date):
+    # Filtrar datos de temperatura mínima y máxima
+    temp_min = datos[(datos['Nombre de la variable'] == 'Temperatura Mínima') & 
+                     (datos['Fecha'] >= start_date) & 
+                     (datos['Fecha'] <= end_date)]
+    temp_max = datos[(datos['Nombre de la variable'] == 'Temperatura Máxima') & 
+                     (datos['Fecha'] >= start_date) & 
+                     (datos['Fecha'] <= end_date)]
+    
+    # Calcular la temperatura media por año
+    temp_min_anual = temp_min.groupby(temp_min['Fecha'].dt.year)['Valor'].mean().reset_index()
+    temp_max_anual = temp_max.groupby(temp_max['Fecha'].dt.year)['Valor'].mean().reset_index()
+    
+    # Combinar los datos de temperatura mínima y máxima
+    temp_media_anual = pd.merge(temp_min_anual, temp_max_anual, on='Fecha', suffixes=('_min', '_max'))
+    temp_media_anual['Temperatura Media'] = (temp_media_anual['Valor_min'] + temp_media_anual['Valor_max']) / 2
+    
+    # Crear el gráfico de barras
+    fig = px.bar(temp_media_anual, x='Fecha', y='Temperatura Media', 
+                 title='Temperatura Media por Año en Torla',
+                 labels={'Temperatura Media': 'Temperatura Media (°C)', 'Fecha': 'Año'},
+                 template='plotly_dark',
+                 color='Temperatura Media',
+                 color_continuous_scale='Viridis')
+    return fig
+
+# Callback para actualizar el gráfico de correlación
+@app.callback(
+    Output('grafico-correlacion', 'figure'),
+    [Input('variable-dropdown', 'value'),
+     Input('date-range', 'start_date'),
+     Input('date-range', 'end_date')]
+)
+def update_grafico_correlacion(selected_variable, start_date, end_date):
+    # Filtrar datos de temperatura y humedad
+    temp_min = datos[(datos['Nombre de la variable'] == 'Temperatura Mínima') & 
+                     (datos['Fecha'] >= start_date) & 
+                     (datos['Fecha'] <= end_date)]
+    humedad_max = datos[(datos['Nombre de la variable'] == 'Humedad Máxima') & 
+                        (datos['Fecha'] >= start_date) & 
+                        (datos['Fecha'] <= end_date)]
+    
+    # Combinar los datos
+    correlacion_data = pd.merge(temp_min, humedad_max, on='Fecha', suffixes=('_temp', '_hum'))
+    
+    # Crear el gráfico de dispersión
+    fig = px.scatter(correlacion_data, x='Valor_temp', y='Valor_hum', 
+                     title='Correlación entre Temperatura Mínima y Humedad Máxima',
+                     labels={'Valor_temp': 'Temperatura Mínima (°C)', 'Valor_hum': 'Humedad Máxima (%)'},
+                     template='plotly_dark',
+                     color='Valor_temp',
+                     color_continuous_scale='Viridis',
+                     hover_data={'Valor_temp': ':.2f', 'Valor_hum': ':.2f'})
+    return fig
 
 # Ejecutar la aplicación
 if __name__ == '__main__':
